@@ -17,9 +17,21 @@ all:	server client
 clean:
 	-rm -f *.o *.d
 	-rm -f server client
+	
+d:
+	-rm cli* ser*
+
+ds:
+	-rm ser*
+
+dc:
+	-rm cli*
 
 server: server.o
-	$(CC) $(LDFLAGS) $(CFLAGS) -o $@ $@.o 
+	$(CC) $(LDFLAGS) $(CFLAGS) -o $@ $@.o -lpthread -lrt -lm
+
+client: client.o
+	$(CC) $(LDFLAGS) $(CFLAGS) -o $@ $@.o -lpthread -lrt -lm
 
 depend:
 
