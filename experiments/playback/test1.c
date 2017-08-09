@@ -22,7 +22,7 @@ int main() {
   int dir;
   snd_pcm_uframes_t frames;
   char *buffer;
-  char *device = "hw:0,3";
+  char *device = "default";
 
   /* Open PCM device for playback. */
   rc = snd_pcm_open(&handle, device,
