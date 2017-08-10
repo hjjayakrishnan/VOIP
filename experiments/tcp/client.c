@@ -6,7 +6,7 @@ Course: 	Real time Embedded Systems
 Professor: Sam Siewart, PhD
 */
 /*
-Description: 	
+Description:
 This is the part of the project on VOIP between two NVIDIA Jetson boards over TCP connection.
 This code is the initialization code and scheduler of the various threads involved at the server side of the system
 */
@@ -27,7 +27,7 @@ This code is the initialization code and scheduler of the various threads involv
 #include <string.h>
 
 
-#define SERVER_IP "127.0.0.1"
+#define SERVER_IP "10.0.0.143"
 #define LOCAL_PORT 1234
 
 extern int errno;
@@ -87,23 +87,23 @@ void cleanerFunction()
 	//printf("\n%d\n",rc);
 	//if(pthread_mutex_destroy(&attSem)!=0)
 	if(rc<0)
-		perror("Mutex destroyed");	
-	printf("\nDone\n");	
+		perror("Mutex destroyed");
+	printf("\nDone\n");
 }
 
 void *threadB(void *threadp)
 {
 	//clockid_t my_clock;
 	struct timespec timeNow_Update;
-	
+
 	//Mutex critical section
 	pthread_mutex_lock(&attSem);
 	printf("Update time is:%lds %ldns\n",timeNow_Update.tv_sec,timeNow_Update.tv_nsec);
-	
-	
-	
+
+
+
 	pthread_mutex_unlock(&attSem);
-	
+
 }
 
 void *threadA(void *threadp)
@@ -111,12 +111,12 @@ void *threadA(void *threadp)
 	struct timespec timeNowRead;
 	struct timespec timeOut;
 
-	
+
 	{
 	clock_gettime(my_clock,&timeNowRead);
 	printf("Read Time is:%lds %ldns\n",timeNowRead.tv_sec,timeNowRead.tv_nsec);
 	//Set the time clock to 10sec more than the current time to obtain the semaphore in that time
-	timeOut.tv_sec=timeNowRead.tv_sec+10;				
+	timeOut.tv_sec=timeNowRead.tv_sec+10;
 	//Mutex critical section
 	//pthread_mutex_lock(&attSem);
 	if((pthread_mutex_timedlock(&attSem, &timeOut))!=0)
@@ -129,7 +129,7 @@ void *threadA(void *threadp)
      else
      {
 		 clock_gettime(my_clock,&timeNowRead);
-         printf("ThreadA got mutex at %lds %ldns\n",timeNowRead.tv_sec,timeNowRead.tv_nsec);		 
+         printf("ThreadA got mutex at %lds %ldns\n",timeNowRead.tv_sec,timeNowRead.tv_nsec);
 		//WHat to do if the semaphore is available
 		pthread_mutex_unlock(&attSem);
 		//usleep(40);
@@ -140,7 +140,7 @@ void *threadA(void *threadp)
 int client_sock;
 FILE *fp;
 struct sockaddr_in client_sockaddr;
-    
+
 void broken_pipe_handler()
 {
 
@@ -157,8 +157,8 @@ void initializeClient()
     struct hostent *hp;
     struct linger opt;
     int sockarg;
-	
-    
+
+
 	//gethostname(hostname, sizeof(hostname));
 
 	if((hp = gethostbyname(SERVER_IP)) == NULL) {
@@ -180,7 +180,7 @@ void initializeClient()
 	client_sockaddr.sin_port = htons(LOCAL_PORT);
 	bcopy(hp->h_addr, &client_sockaddr.sin_addr, hp->h_length);
 
-    /* discard undelivered data on closed socket */ 
+    /* discard undelivered data on closed socket */
     opt.l_onoff = 1;
     opt.l_linger = 0;
 
@@ -195,10 +195,10 @@ void initializeClient()
 void *requestServer()
 {
 	int num_sets;
-	char fileToRead_Ptr[50];
-      
-    
-    if(connect(client_sock, (struct sockaddr*)&client_sockaddr, sizeof(client_sockaddr)) < 0) 
+	// char fileToRead_Ptr[50];
+
+
+    if(connect(client_sock, (struct sockaddr*)&client_sockaddr, sizeof(client_sockaddr)) < 0)
     {
 	perror("client: connect");
 	exit(1);
@@ -212,23 +212,23 @@ void *requestServer()
 	signal(SIGPIPE, broken_pipe_handler);
 
 	fp = fdopen(client_sock, "r");
-	
+
 	char ack='1';
 	char buffer[50];
-	
+
 	recv(client_sock, (char *)&num_sets, sizeof(int), 0);
 	printf("number of sets = %d\n", num_sets);
 	send(client_sock, &ack, sizeof(char), 0);
 	recv(client_sock, (char *)&buffer, num_sets, 0);
-	
+
 	int count=0;
 	printf("%s \n", buffer);
-	/*while(count<num_sets) 
-	{		
+	/*while(count<num_sets)
+	{
 		//prints the characters that were received
 		count++;
 		c = fgetc(fp);			//use this for obtaining individial characters from the file pointer
-		
+
 		putchar(c);
 	} */
 	close(client_sock);
@@ -246,7 +246,7 @@ int main (int argc, char *argv[])
 	//Scheduler
 	print_scheduler();
 	rc=sched_getparam(mainpid, &main_param);
-	if (rc) 
+	if (rc)
    {
        printf("ERROR; sched_setscheduler rc is %d\n", rc);
        perror(NULL);
