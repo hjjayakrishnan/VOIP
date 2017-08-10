@@ -31,7 +31,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params){
 
   unsigned int rrate;
   int err, dir=1, rc;
-
+  snd_pcm_uframes_t size_;
   /* Allocate hardware parameters  */
 
   /* Fill it in with default values. */
@@ -82,7 +82,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params){
 
   /* Set period size to 32 frames. */
 
-  snd_pcm_hw_params_set_period_size_near(handle,
+  err = snd_pcm_hw_params_set_period_size_near(handle,
                               params, &frames, &dir);
   if (err < 0) {
     printf("Unable to set period size for playback: %s\n", snd_strerror(err));
@@ -102,6 +102,13 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params){
   snd_pcm_hw_params_get_period_time(params,
                                     &period_time, 0);
   printf("period time:%d uS\n", period_time);
+
+  err = snd_pcm_hw_params_get_buffer_size(params, &size_);
+  if (err < 0) {
+          printf("Unable to get buffer size for playback: %s\n", snd_strerror(err));
+          return err;
+  }
+  printf("buffer size:%d frames\n", size_);
 
   return 0;
 }
