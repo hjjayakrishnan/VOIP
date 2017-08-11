@@ -45,7 +45,7 @@ static unsigned int rate = 44100;
 unsigned int size;
 snd_pcm_uframes_t frames = 32;
 unsigned int period_time;
-char *buffer1, *buffer2;
+char *buffer_s128_1, *buffer_s128_2, *buffer_s32;
 snd_pcm_t *handle;
 
 // POSIX thread declarations and scheduling attributes
@@ -71,8 +71,9 @@ void int_handler()
   printf("\n Freeing buffers and closing pcm handles");
   snd_pcm_drain(handle);
   snd_pcm_close(handle);
-  free(buffer1);
-  free(buffer2);
+  free(buffer_s32);
+  free(buffer_s128_1);
+  free(buffer_s128_2);
 
 	exit(0);
 
@@ -274,13 +275,10 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params){
 }
 
 static int playBack(snd_pcm_t *handle){
-
-  printf("in playback\n");
-
-
   /* TCP */
 
-  int num_sets;
+  int num_sets = size;
+  int p;
   if(connect(client_sock, (struct sockaddr*)&client_sockaddr, sizeof(client_sockaddr)) < 0)
   {
     perror("client: connect");
@@ -300,11 +298,13 @@ static int playBack(snd_pcm_t *handle){
   double sum = 0;
   double avg_exec_time, delay;
 
-  recv(client_sock, (char *)&buffer1, num_sets, 0);
+  recv(client_sock, (char *)&num_sets, sizeof(int), 0);
+  recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+  fprintf(stderr,"\nin playback : %d", strlen(buffer_s128_1));
 
   while (1) {
 
-    rc = snd_pcm_writei(handle, buffer1, frames);
+    rc = snd_pcm_writei(handle, buffer_s128_1, frames);
 
     if (rc == -EPIPE) {
       /* EPIPE means underrun */
@@ -319,17 +319,19 @@ static int playBack(snd_pcm_t *handle){
 
     }
 
-    recv(client_sock, (char *)&buffer2, num_sets, 0);
 
-    while(sizeof(buffer2)!=128);
-    buffer1 = buffer2;
+    recv(client_sock, (char *)&num_sets, sizeof(int), 0);
+    fprintf(stderr,"\nnum sets : %d", num_sets);
+    recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+    fprintf(stderr,"\nloop : %d", strlen(buffer_s128_1));
 
   }
 
   snd_pcm_drain(handle);
   snd_pcm_close(handle);
-  free(buffer1);
-  free(buffer2);
+  free(buffer_s128_1);
+  free(buffer_s128_2);
+  free(buffer_s32);
 
 }
 
@@ -350,8 +352,11 @@ int main (int argc, char *argv[])
   snd_pcm_hw_params_t *hwparams;
   snd_pcm_hw_params_alloca(&hwparams);
   size = (int)frames * 4; /* 2 bytes/sample, 2 channels */
-  buffer1 = (char *) malloc(size);
-  buffer2 = (char *) malloc(size);
+  //size =32;
+
+  buffer_s128_1 = (char *) malloc(size);
+  buffer_s128_2 = (char *) malloc(size);
+  buffer_s32 = (char *) malloc(size/4);
 
   printf("Playback device : %s \n", device);
 
