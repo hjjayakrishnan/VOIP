@@ -7,18 +7,18 @@ CFLAGS=  -g $(INCLUDE_DIRS) $(CDEFS)
 LIBS=	-lasound
 
 HFILES=
-CFILES= tcp_record.c
+CFILES= record_server.c
 
 SRCS= ${HFILES} ${CFILES}
 OBJS= ${CFILES:.c=.o}
 
-all:	tcp_record
+all:	record_server
 
 clean:
 	-rm -f *.o *.d
-	-rm -f tcp_record
+	-rm -f record_server
 
-tcp_record: tcp_record.o
+record_server: record_server.o
 	$(CC) $(LDFLAGS) $(CFLAGS) -o $@ $@.o -lpthread -lasound -ldl -lm -lrt
 
 depend:
