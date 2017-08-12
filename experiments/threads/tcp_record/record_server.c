@@ -55,7 +55,7 @@ snd_pcm_hw_params_t *params;
 int size1=32;
 clockid_t my_clock;
 pthread_mutex_t attSem;
-
+FILE *serverFilePtr;
 
 // POSIX thread declarations and scheduling attributes
 typedef struct
@@ -197,7 +197,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params)
   val = 44100;
   err=snd_pcm_hw_params_set_rate_near(handle, params,&val, &dir);
   if (err < 0) {
-    printf("Rate %iHz not available for record: %s\n", rate, snd_strerror(err));
+    printf("Rate %iHz not available for record: %s\n", val, snd_strerror(err));
     return err;
   }
   /* Set period size to 32 frames. */
@@ -224,7 +224,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params)
 }
 
 static int record(snd_pcm_t *handle){
-  FILE *serverFilePtr;
+  
   long loops, num;
   int rc;
   double start = 0, stop = 0;
