@@ -33,10 +33,9 @@ This code is the initialization code and scheduler of the various threads involv
 #define SERVER_IP "10.0.0.143"
 
 extern int errno;
-extern void int_handler();
 extern void broken_pipe_handler();
 static int server_sock, client_sock;
-static int fromlen, i, j, num_sets;
+static int fromlen, i, j;
 static char c;
 static FILE *fp;
 static struct sockaddr_in server_sockaddr, client_sockaddr;
@@ -57,7 +56,7 @@ int size1=32;
 clockid_t my_clock;
 pthread_mutex_t attSem;
 FILE *serverFilePtr;
-snd_pcm_hw_params_t *hwparams_record;
+//snd_pcm_hw_params_t *hwparams_record;
 snd_pcm_hw_params_t *hwparams_playback;
 // POSIX thread declarations and scheduling attributes
 typedef struct
@@ -117,6 +116,8 @@ void broken_pipe_handler()
   snd_pcm_drain(hwhandle_p);
   snd_pcm_close(hwhandle_p);
   //free(buffer);
+  free(buffer_record);
+  free(buffer_s128_1);    
 
   
   exit(0);
@@ -175,6 +176,7 @@ static int set_playback_hwparams(snd_pcm_t *hwhandle_p, snd_pcm_hw_params_t *hwp
   int dir=1;
   int rc;
   int err;
+  snd_pcm_uframes_t size_;
   /* Fill it in with default values. */
   err =snd_pcm_hw_params_any(hwhandle_p, hwparams_playback);
   if (err < 0) {
@@ -227,9 +229,17 @@ static int set_playback_hwparams(snd_pcm_t *hwhandle_p, snd_pcm_hw_params_t *hwp
   /* We want to loop for 5 seconds */
   snd_pcm_hw_params_get_period_time(hwparams_playback,&period_time, 0);
 
+  err = snd_pcm_hw_params_get_buffer_size(hwparams_playback, &size_);
+  if (err < 0) {
+          printf("Unable to get buffer size for playback: %s\n", snd_strerror(err));
+          return err;
+  }
+  printf("buffer size:%d frames\n", size_);
+
 
   return 0;
 }
+#if 0
 static int set_record_hwparams(snd_pcm_t *hwhandle_r, snd_pcm_hw_params_t *hwparams_record)
 {
   int dir=1;
@@ -291,9 +301,9 @@ static int set_record_hwparams(snd_pcm_t *hwhandle_r, snd_pcm_hw_params_t *hwpar
 
   return 0;
 }
+#endif
 
-
-
+#if 0
 static int record(snd_pcm_t *hwhandle_r){
   long loops, num;
   int rc;
@@ -305,31 +315,101 @@ static int record(snd_pcm_t *hwhandle_r){
   int count=0;
   
   int lengthOfString=0;
-    loops--;
-    count++;
     //fprintf(stderr,"count%d\n",count);
-    rc = snd_pcm_readi(hwhandle_r, buffer_record, frames);
-    if (rc == -EPIPE) {
+  rc = snd_pcm_readi(hwhandle_r, buffer_record, frames);
+  if (rc == -EPIPE) {
     /* EPIPE means overrun */
-    fprintf(stderr, "overrun occurred\n");
-    snd_pcm_prepare(hwhandle_r);
-    } else if (rc < 0) {
-      fprintf(stderr,
-             "error from read: %s\n",
-              snd_strerror(rc));
-    } else if (rc != (int)frames) {
-      fprintf(stderr, "short read, read %d frames\n", rc);
-    }
+   fprintf(stderr, "overrun occurred\n");
+   snd_pcm_prepare(hwhandle_r);
+  } else if (rc < 0) {
+    fprintf(stderr,
+            "error from read: %s\n",
+             snd_strerror(rc));
+   } else if (rc != (int)frames) {
+     fprintf(stderr, "short read, read %d frames\n", rc);
+   }
     //rc = write(1, buffer, size);
     lengthOfString=strlen(buffer_record); 
     fprintf(stderr,"\n buffer length: %d \n", lengthOfString);
-    send(client_sock, (char *)(&lengthOfString), sizeof(int), 0);   //This sends to the server the number of bytes that the client has and wishes to transfer.  
+    send(client_sock, (char *)(&lengthOfString), sizeof(int), 0);   //This sends to the server the number of bytes that the client has and wishes to transfer. 
+  //  fprintf(stderr, "length sent%s\n", lengthOfString); 
     send(client_sock, (char *)(buffer_record), lengthOfString, 0);
-    
-  //free(buffer);
+  
   
 }
 
+#endif
+
+static int playBack(snd_pcm_t *hwhandle_p){
+  /* TCP */
+
+  int num_sets = 0;
+  int rc;
+  int count_=0;
+  recv(client_sock, (char *)&num_sets, sizeof(int), 0);
+  buffer_s128_1= (char *) malloc(num_sets);
+  recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+  rc = snd_pcm_writei(hwhandle_p, buffer_s128_1, frames);
+
+    if (rc == -EPIPE) {
+      /* EPIPE means underrun */
+      //fprintf(stderr, "underrun occurred\n");
+      snd_pcm_prepare(hwhandle_p);
+
+    } else if (rc < 0) {
+      //fprintf(stderr,"error from writei: %s\n", snd_strerror(rc));
+
+    }  else if (rc != (int)frames) {
+      //fprintf(stderr, "short write, write %d frames\n", rc);
+
+    }
+  fprintf(stderr,"\nin playback : %d", strlen(buffer_s128_1));
+  while (1) {
+    ++count_;
+
+    
+
+    rc = recv(client_sock, (char *)&num_sets, sizeof(int), 0);
+    fprintf(stderr, "\n return value numsets: %d", rc);
+      
+
+    
+    if(num_sets<0){
+        fprintf(stderr,"\nNegative\n");
+        num_sets=0;
+        continue;
+      }
+    buffer_s128_1= (char *) malloc(num_sets);
+    fprintf(stderr,"\nnum sets : %d", num_sets);
+    recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+    fprintf(stderr,"\nloop : %d", strlen(buffer_s128_1));
+    fprintf(stderr, "\n count : %d\n", count_);
+
+    rc = snd_pcm_writei(hwhandle_p, buffer_s128_1, frames);
+
+    if (rc == -EPIPE) {
+      /* EPIPE means underrun */
+      //fprintf(stderr, "underrun occurred\n");
+      snd_pcm_prepare(hwhandle_p);
+
+    } else if (rc < 0) {
+      //fprintf(stderr,"error from writei: %s\n", snd_strerror(rc));
+
+    }  else if (rc != (int)frames) {
+      //fprintf(stderr, "short write, write %d frames\n", rc);
+
+    }
+    free(buffer_s128_1);
+  }
+
+  
+  snd_pcm_drain(hwhandle_p);
+  snd_pcm_close(hwhandle_p);
+  free(buffer_s128_1);
+
+}
+
+#if 0
 static int playBack(snd_pcm_t *hwhandle_p){
   /* TCP */
 
@@ -340,19 +420,20 @@ static int playBack(snd_pcm_t *hwhandle_p){
   double start = 0, stop = 0;
   double sum = 0;
   double avg_exec_time, delay;
-
+  while(1){
   /*recv(client_sock, (char *)&num_sets, sizeof(int), 0);
   recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
   fprintf(stderr,"\nin playback : %d", strlen(buffer_s128_1));*/
-   recv(client_sock, (char *)&num_sets, sizeof(int), 0);
-   buffer_s128_1= (char *) malloc(num_sets);
-   fprintf(stderr,"\nnum sets : %d", num_sets);
-   recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
-   
-   fprintf(stderr,"\nloop : %d", strlen(buffer_s128_1));
-    rc = snd_pcm_writei(hwhandle_p, buffer_s128_1, frames);
+  rc=recv(client_sock, (char *)&num_sets, sizeof(int), 0);
+  fprintf(stderr,"data got %d\n",rc);
+  fprintf(stderr,"\nnum sets : %d", num_sets);
+  buffer_s128_1= (char *) malloc(num_sets);
+  rc=recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+  fprintf(stderr,"data got from buffer%d\n",rc);
+  fprintf(stderr,"\nloop : %d", strlen(buffer_s128_1));
+  rc = snd_pcm_writei(hwhandle_p, buffer_s128_1, frames);
     if (rc == -EPIPE) {
-      /* EPIPE means underrun */
+     /* EPIPE means underrun */
      fprintf(stderr, "underrun occurred\n");
       snd_pcm_prepare(hwhandle_p);
 
@@ -363,11 +444,14 @@ static int playBack(snd_pcm_t *hwhandle_p){
       fprintf(stderr, "short write, write %d frames\n", rc);
 
     }
+
+ }
     free (buffer_s128_1);
 
 
 
 }
+#endif
 void *recordThread(void *threadp)
 {
   
@@ -400,11 +484,11 @@ void *recordThread(void *threadp)
       }      
     } 
     fp = fdopen(client_sock, "r"); 
-    fprintf(stdout,"before reand and write");
-    rc = snd_pcm_readi(hwhandle_r, buffer_record, frames);
+   // fprintf(stdout,"before reand and write");
+   /* rc = snd_pcm_readi(hwhandle_r, buffer_record, frames);
     if (rc == -EPIPE) {
     /* EPIPE means overrun */
-    fprintf(stderr, "overrun occurred\n");
+   /* fprintf(stderr, "overrun occurred\n");
     snd_pcm_prepare(hwhandle_r);
     } else if (rc < 0) {
       fprintf(stderr,
@@ -414,15 +498,13 @@ void *recordThread(void *threadp)
       fprintf(stderr, "short read, read %d frames\n", rc);
     }
     int lengthOfString=0;
-    lengthOfString=strlen(buffer_record);
-     send(client_sock, (char *)(buffer_record), lengthOfString, 0);
+    lengthOfString=strlen(buffer_record);*/
+     //send(client_sock, (char *)(buffer_record), lengthOfString, 0);
     //rc = snd_pcm_readi(hwhandle_p, buffer_s128_1, frames);
-    fprintf(stdout,"the 1st read and write");
-   while(1){
+    //fprintf(stdout,"the 1st read and write");
    
     playBack(hwhandle_p);
-    record(hwhandle_r);
-   }
+    //record(hwhandle_r);
  
  
 }
@@ -481,11 +563,11 @@ int main (int argc, char *argv[])
 	int i;
 	cpu_set_t cpuset;
   buffer_record = (char *) malloc(size);
-  snd_pcm_hw_params_alloca(&hwparams_record);
+  //snd_pcm_hw_params_alloca(&hwparams_record);
 
   snd_pcm_hw_params_alloca(&hwparams_playback);
 //record 
-  rc = snd_pcm_open(&hwhandle_r, "default",SND_PCM_STREAM_CAPTURE, 0);
+  /*c = snd_pcm_open(&hwhandle_r, "default",SND_PCM_STREAM_CAPTURE, 0);
   if (rc < 0) {
     fprintf(stderr,
             "unable to open pcm device: %s\n",
@@ -496,7 +578,7 @@ int main (int argc, char *argv[])
       printf("Setting of hwparams failed: %s\n",snd_strerror(rc));
       exit(EXIT_FAILURE);
   }
-
+*/
 //playback
   const char *device = "default";
   rc = snd_pcm_open(&hwhandle_p, device,SND_PCM_STREAM_PLAYBACK, 0);

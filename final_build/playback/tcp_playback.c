@@ -30,7 +30,7 @@ This code is the initialization code and scheduler of the various threads involv
 
 #define NUM_THREADS 2
 #define ALSA_PCM_NEW_HW_PARAMS_API
-#define SERVER_IP "10.0.0.143"
+#define SERVER_IP "10.0.0.192"
 #define LOCAL_PORT 1234
 
 clockid_t my_clock;
@@ -401,7 +401,7 @@ int main (int argc, char *argv[])
 	int i;
 
   /* ALSA parameters */
-  const char *device = "hw:0,3";
+  const char *device = "hw:0,7";
   snd_pcm_hw_params_t *hwparams;
   snd_pcm_hw_params_alloca(&hwparams);
   size = (int)frames * 4; /* 2 bytes/sample, 2 channels */
