@@ -81,7 +81,8 @@ void int_handler()
   free(buffer_s32);
   free(buffer_s128_1);
   free(buffer_s128_2);
-  exit(0);
+
+	exit(0);
 
 }
 
@@ -91,14 +92,15 @@ void int_handler()
 
 void broken_pipe_handler()
 {
-  printf("\nbroken pipe signal received\n");
-  cleanerFunction();
+
+	printf("\nbroken pipe signal received\n");
+	cleanerFunction();
   snd_pcm_drain(handle);
   snd_pcm_close(handle);
   free(buffer_s32);
   free(buffer_s128_1);
   free(buffer_s128_2);
-  exit(0);
+	exit(0);
 
 }
 
@@ -155,12 +157,12 @@ void print_scheduler(void)
 
 void cleanerFunction()
 {
-  int rc;
-  //Clearing up the system
-  rc=pthread_mutex_destroy(&attSem);
-  if(rc<0)
-    perror("Mutex destroyed");
-  printf("\nDone\n");
+	int rc;
+	//Clearing up the system
+	rc=pthread_mutex_destroy(&attSem);
+	if(rc<0)
+		perror("Mutex destroyed");
+	printf("\nDone\n");
 }
 
 /*
@@ -169,33 +171,33 @@ void cleanerFunction()
 
 void initializeClient()
 {
-  char c;
+	char c;
   char hostname[64];
   struct hostent *hp;
   struct linger opt;
   int sockarg;
 
 
-  //gethostname(hostname, sizeof(hostname));
+	//gethostname(hostname, sizeof(hostname));
 
-  if((hp = gethostbyname(SERVER_IP)) == NULL) {
-    fprintf(stderr, "%s: unknown host.\n", hostname);
-    exit(1);
-  }
+	if((hp = gethostbyname(SERVER_IP)) == NULL) {
+		fprintf(stderr, "%s: unknown host.\n", hostname);
+		exit(1);
+	}
   else
   {
       printf("Connected to %s\n", SERVER_IP);
   }
 
-  if((client_sock=socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-    perror("client: socket");
-    exit(1);
-  }
+	if((client_sock=socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("client: socket");
+		exit(1);
+	}
 
-  client_sockaddr.sin_family = AF_INET;
-  printf("Will connect to port %d \n", LOCAL_PORT);
-  client_sockaddr.sin_port = htons(LOCAL_PORT);
-  bcopy(hp->h_addr, &client_sockaddr.sin_addr, hp->h_length);
+	client_sockaddr.sin_family = AF_INET;
+	printf("Will connect to port %d \n", LOCAL_PORT);
+	client_sockaddr.sin_port = htons(LOCAL_PORT);
+	bcopy(hp->h_addr, &client_sockaddr.sin_addr, hp->h_length);
 
   /* discard undelivered data on closed socket */
   opt.l_onoff = 1;
@@ -319,17 +321,25 @@ static int playBack(snd_pcm_t *handle){
 
   long loops, num;
   int rc;
+  ssize_t ret;
   double start = 0, stop = 0;
   double sum = 0;
   double avg_exec_time, delay;
 
-  recv(client_sock, (char *)&num_sets, sizeof(int), 0);
-  recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+  ret = recv(client_sock, (char *)&num_sets, sizeof(int), 0);
+  fprintf(stderr, "bytes from first msg : %d", ret);
+  buffer_s128_1 = (char *) malloc(num_sets);
+  ret = recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+  fprintf(stderr, "bytes from audio packet : %d", ret);
+
   fprintf(stderr,"\nin playback : %d", strlen(buffer_s128_1));
+  rc = snd_pcm_writei(handle, buffer_s128_1, frames);
+  free (buffer_s128_1);
 
   while (1) {
 
-    rc = snd_pcm_writei(handle, buffer_s128_1, frames);
+
+
 
     if (rc == -EPIPE) {
       /* EPIPE means underrun */
@@ -345,11 +355,21 @@ static int playBack(snd_pcm_t *handle){
     }
 
 
-    recv(client_sock, (char *)&num_sets, sizeof(int), 0);
-    fprintf(stderr,"\nnum sets : %d", num_sets);
-    recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
-    fprintf(stderr,"\nloop : %d", strlen(buffer_s128_1));
+    ret = recv(client_sock, (char *)&num_sets, sizeof(int), 0);
+    // fprintf(stderr,"\n\n *************************************");
+    // fprintf(stderr,"\n a. Incoming audio data bytes (should match audio string length): %d", num_sets);
+    // fprintf(stderr, "\n b. return code (should be 8) : %d", ret);
 
+    buffer_s128_1 = (char *) malloc(num_sets);
+
+    ret = recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+    // fprintf(stderr,"\n c. audio string length : %d", strlen(buffer_s128_1));
+    // fprintf(stderr, "\n d. return code (should match): %d", ret);
+    // fprintf(stderr,"\na,c,d should be same");
+    // fprintf(stderr,"\n\n *************************************");
+    rc = snd_pcm_writei(handle, buffer_s128_1, frames);
+
+    free (buffer_s128_1);
   }
 
   snd_pcm_drain(handle);
@@ -377,17 +397,17 @@ void *playBackthread(void *threadp)
 
 int main (int argc, char *argv[])
 {
-  int rc;
-  int i;
+	int rc;
+	int i;
 
   /* ALSA parameters */
-  const char *device = "hw:1,0";
+  const char *device = "hw:0,3";
   snd_pcm_hw_params_t *hwparams;
   snd_pcm_hw_params_alloca(&hwparams);
   size = (int)frames * 4; /* 2 bytes/sample, 2 channels */
   //size =32;
 
-  buffer_s128_1 = (char *) malloc(size);
+  // buffer_s128_1 = (char *) calloc(size);
   buffer_s128_2 = (char *) malloc(size);
   buffer_s32 = (char *) malloc(size/4);
 
@@ -408,26 +428,26 @@ int main (int argc, char *argv[])
   /*end of ALSA parameters */
 
 
-  cpu_set_t cpuset;
-  mainpid=getpid();
+	cpu_set_t cpuset;
+	mainpid=getpid();
 
-  //Scheduler
-  print_scheduler();
-  rc=sched_getparam(mainpid, &main_param);
-  if (rc)
+	//Scheduler
+	print_scheduler();
+	rc=sched_getparam(mainpid, &main_param);
+	if (rc)
    {
      printf("ERROR; sched_setscheduler rc is %d\n", rc);
      perror(NULL);
      exit(-1);
    }
    //Obtain the priorities of the scheduler
-  rt_max_prio = sched_get_priority_max(SCHED_FIFO);
-  rt_min_prio = sched_get_priority_min(SCHED_FIFO);
+	rt_max_prio = sched_get_priority_max(SCHED_FIFO);
+	rt_min_prio = sched_get_priority_min(SCHED_FIFO);
 
-  main_param.sched_priority=rt_max_prio;
-  rc=sched_setscheduler(getpid(), SCHED_FIFO, &main_param);
-  if(rc < 0) perror("main_param");
-    print_scheduler();
+	main_param.sched_priority=rt_max_prio;
+	rc=sched_setscheduler(getpid(), SCHED_FIFO, &main_param);
+	if(rc < 0) perror("main_param");
+	print_scheduler();
 
 	/*
 	pthread_attr_getscope(&main_attr, &scope);
@@ -442,31 +462,31 @@ int main (int argc, char *argv[])
 	printf("rt_max_prio=%d\n", rt_max_prio);
 	printf("rt_min_prio=%d\n", rt_min_prio);
 	*/
-  for(i=0; i < NUM_THREADS; i++)
-  {
-    rc=pthread_attr_init(&rt_sched_attr[i]);
-    rc=pthread_attr_setinheritsched(&rt_sched_attr[i], PTHREAD_EXPLICIT_SCHED);
-    rc=pthread_attr_setschedpolicy(&rt_sched_attr[i], SCHED_FIFO);
+	for(i=0; i < NUM_THREADS; i++)
+	{
+		rc=pthread_attr_init(&rt_sched_attr[i]);
+		rc=pthread_attr_setinheritsched(&rt_sched_attr[i], PTHREAD_EXPLICIT_SCHED);
+		rc=pthread_attr_setschedpolicy(&rt_sched_attr[i], SCHED_FIFO);
 		//rc=pthread_attr_setaffinity_np(&rt_sched_attr[i], sizeof(cpu_set_t), &cpuset);
 
-   rt_param[i].sched_priority=rt_max_prio-i-1;
-   pthread_attr_setschedparam(&rt_sched_attr[i], &rt_param[i]);
+		rt_param[i].sched_priority=rt_max_prio-i-1;
+		pthread_attr_setschedparam(&rt_sched_attr[i], &rt_param[i]);
 
-   threadParams[i].threadIdx=i;
-  }
+		threadParams[i].threadIdx=i;
+	}
 /*********************************************************************************/
    //Mutex creation
-  pthread_mutex_init(&attSem,NULL);
+	pthread_mutex_init(&attSem,NULL);
   initializeClient();
   signal(SIGINT, int_handler);
 /*********************************************************************************/
 
 	//Thread creation
-  pthread_create(&threads[0],   // pointer to thread descriptor
-			    (void *)0,     // use default attributes
-			    playBackthread, // thread function entry
-          (void *)&(threadParams[0]) // parameters to pass in		//Cant pass nothing so just pass a number
-					);
+	pthread_create(&threads[0],   // pointer to thread descriptor
+					  (void *)0,     // use default attributes
+					  playBackthread, // thread function entry point
+					  (void *)&(threadParams[0]) // parameters to pass in		//Cant pass nothing so just pass a number
+					 );
 
 	// pthread_create(&threads[1],   // pointer to thread descriptor
 	// 				  (void *)0,     // use default attributes
@@ -477,5 +497,5 @@ int main (int argc, char *argv[])
   pthread_join(threads[0], NULL);
 	// pthread_join(threads[1], NULL);
 /*********************************************************************************/
-  cleanerFunction();
+	cleanerFunction();
 }
