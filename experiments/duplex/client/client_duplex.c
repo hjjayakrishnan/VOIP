@@ -412,13 +412,14 @@ static int playBack(snd_pcm_t *handle_p){
   signal(SIGPIPE, broken_pipe_handler);
   fp = fdopen(client_sock, "r");
 
-  long loops, num;
+  long loops, num=0;
   int rc;
   ssize_t ret;
   double start = 0, stop = 0;
   double sum = 0;
   double avg_exec_time, delay;
   int lengthOfString;
+  int fake = 1;
 
   ret = recv(client_sock, (char *)&num_sets, sizeof(int), 0);
   fprintf(stderr, "bytes from first msg : %d", ret);
@@ -430,6 +431,8 @@ static int playBack(snd_pcm_t *handle_p){
   fprintf(stderr,"\nin playback : %d", strlen(buffer_s128_1));
 
   while (1) {
+
+    ++num;
 
     // Record + send
     rc = snd_pcm_readi(handle_r, buffer_s128_2, frames);
@@ -447,20 +450,32 @@ static int playBack(snd_pcm_t *handle_p){
     }
 
     lengthOfString=strlen(buffer_s128_2);
-    fprintf(stderr,"\n buffer length: %d \n", lengthOfString);
-    send(client_sock, (char *)(&lengthOfString), sizeof(int), 0);   //This sends to the server the number of bytes that the client has and wishes to transfer.
-    send(client_sock, (char *)(buffer_s128_2), lengthOfString, 0);
+    fprintf(stderr,"\n sent buffer length: %d \n", lengthOfString);
+    if(lengthOfString!=0){
+      send(client_sock, (char *)(&lengthOfString), sizeof(int), 0);   //This sends to the server the number of bytes that the client has and wishes to transfer.
+      send(client_sock, (char *)(buffer_s128_2), lengthOfString, 0);
+    }
+    else{
+      buffer_s128_2[0] = '1';
+      fake = strlen(buffer_s128_2);
+      send(client_sock, (char *)(&fake), sizeof(int), 0);   //This sends to the server the number of bytes that the client has and wishes to transfer.
+      send(client_sock, (char *)(buffer_s128_2), fake, 0);
+    }
 
+    fprintf(stderr,"\nrecorded and sent %d audio\n", num);
 
 
 
     // Receive + playback
     ret = recv(client_sock, (char *)&num_sets, sizeof(int), 0);
+    ret = recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+
     // fprintf(stderr,"\n\n *************************************");
     // fprintf(stderr,"\n a. Incoming audio data bytes (should match audio string length): %d", num_sets);
     // fprintf(stderr, "\n b. return code (should be 8) : %d", ret);
-    buffer_s128_1 = (char *) malloc(num_sets);
-    ret = recv(client_sock, (char *)buffer_s128_1, num_sets, 0);
+    // buffer_s128_1 = (char *) malloc(num_sets);
+
+
     // fprintf(stderr,"\n c. audio string length : %d", strlen(buffer_s128_1));
     // fprintf(stderr, "\n d. return code (should match): %d", ret);
     // fprintf(stderr,"\na,c,d should be same");
@@ -478,7 +493,9 @@ static int playBack(snd_pcm_t *handle_p){
       fprintf(stderr, "short write, write %d frames\n", rc);
 
     }
-    free(buffer_s128_1);
+    fprintf(stderr,"\n received buffer length: %d \n", num_sets);
+    fprintf(stderr,"\nreceived and played %d audio\n", num);
+    // free(buffer_s128_1);
 
 
   }
