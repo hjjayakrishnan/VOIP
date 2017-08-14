@@ -446,7 +446,7 @@ static int playBack(snd_pcm_t *handle_p){
 
     }
 
-    lengthOfString=strlen(buffer_s128_1);
+    lengthOfString=strlen(buffer_s128_2);
     fprintf(stderr,"\n buffer length: %d \n", lengthOfString);
     send(client_sock, (char *)(&lengthOfString), sizeof(int), 0);   //This sends to the server the number of bytes that the client has and wishes to transfer.
     send(client_sock, (char *)(buffer_s128_2), lengthOfString, 0);
@@ -520,7 +520,7 @@ int main (int argc, char *argv[])
   size = (int)frames * 4; /* 2 bytes/sample, 2 channels */
   //size =32;
 
-  // buffer_s128_1 = (char *) calloc(size);
+  buffer_s128_1 = (char *) malloc(size);
   buffer_s128_2 = (char *) malloc(size);
   buffer_s32 = (char *) malloc(size/4);
 
