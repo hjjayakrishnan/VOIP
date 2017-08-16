@@ -458,57 +458,57 @@ int main (int argc, char *argv[])
 
   sem_init(&rcdSem,0,0);
   sem_init(&tcpSem,0,1);
-	int rc;
-	int i;
-	cpu_set_t cpuset;
+  int rc;
+  int i;
+  cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
   CPU_SET(1, &cpuset);
-	mainpid=getpid();
+  mainpid=getpid();
 
 	//Scheduler
-	print_scheduler();
-	rc=sched_getparam(mainpid, &main_param);
-	if (rc)
+  print_scheduler();
+  rc=sched_getparam(mainpid, &main_param);
+  if (rc)
    {
-       printf("ERROR; sched_setscheduler rc is %d\n", rc);
-       perror(NULL);
-       exit(-1);
+     printf("ERROR; sched_setscheduler rc is %d\n", rc);
+     perror(NULL);
+     exit(-1);
    }
    //Obtain the priorities of the scheduler
-	rt_max_prio = sched_get_priority_max(SCHED_FIFO);
-	rt_min_prio = sched_get_priority_min(SCHED_FIFO);
+  rt_max_prio = sched_get_priority_max(SCHED_FIFO);
+  rt_min_prio = sched_get_priority_min(SCHED_FIFO);
 
-	main_param.sched_priority=rt_max_prio;
-	rc=sched_setscheduler(getpid(), SCHED_FIFO, &main_param);
-	if(rc < 0) perror("main_param");
-	print_scheduler();
+  main_param.sched_priority=rt_max_prio;
+  rc=sched_setscheduler(getpid(), SCHED_FIFO, &main_param);
+  if(rc < 0) perror("main_param");
+  print_scheduler();
 
-	for(i=0; i < NUM_THREADS; i++)
-	{
-		rc=pthread_attr_init(&rt_sched_attr[i]);
-		rc=pthread_attr_setinheritsched(&rt_sched_attr[i], PTHREAD_EXPLICIT_SCHED);
-		rc=pthread_attr_setschedpolicy(&rt_sched_attr[i], SCHED_FIFO);
-		rt_param[i].sched_priority=rt_max_prio-i-1;
-		pthread_attr_setschedparam(&rt_sched_attr[i], &rt_param[i]);
-    pthread_attr_setaffinity_np(&rt_sched_attr[i], sizeof(cpu_set_t), &cpuset);
-		threadParams[i].threadIdx=i;
-	}
+  for(i=0; i < NUM_THREADS; i++)
+  {
+     rc=pthread_attr_init(&rt_sched_attr[i]);
+     rc=pthread_attr_setinheritsched(&rt_sched_attr[i], PTHREAD_EXPLICIT_SCHED);
+     rc=pthread_attr_setschedpolicy(&rt_sched_attr[i], SCHED_FIFO);
+     rt_param[i].sched_priority=rt_max_prio-i-1;
+     pthread_attr_setschedparam(&rt_sched_attr[i], &rt_param[i]);
+     pthread_attr_setaffinity_np(&rt_sched_attr[i], sizeof(cpu_set_t), &cpuset);
+     threadParams[i].threadIdx=i;
+   }
 /*********************************************************************************/
   initializeServer();
 /*********************************************************************************/
 
 	//Thread creation
-	pthread_create(&threads[0],   // pointer to thread descriptor
-					  &rt_sched_attr[0],     // use default attributes
-					  sendThread, // thread function entry point
-					  (void *)&(threadParams[0]) // parameters to pass in		//Cant pass nothing so just pass a number
-					 );
+  pthread_create(&threads[0],   // pointer to thread descriptor
+		 &rt_sched_attr[0],     // use default attributes
+		 sendThread, // thread function entry point
+		 (void *)&(threadParams[0]) // parameters to pass in		//Cant pass nothing so just pass a number
+		);
 
-	pthread_create(&threads[1],   // pointer to thread descriptor
-					  &rt_sched_attr[1],     // use default attributes
-					 recordThread, // thread function entry point
-					  (void *)&(threadParams[1]) // parameters to pass in		//Cant pass nothing so just pass a number
-					 );
+  pthread_create(&threads[1],   // pointer to thread descriptor
+		 &rt_sched_attr[1],     // use default attributes
+		 recordThread, // thread function entry point
+		 (void *)&(threadParams[1]) // parameters to pass in		//Cant pass nothing so just pass a number
+		);
 
 //sequence//
 
