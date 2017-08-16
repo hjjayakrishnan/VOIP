@@ -6,13 +6,15 @@ Course: 	Real time Embedded Systems
 Professor: Sam Siewart, PhD
 */
 /*
-Description: 	
+Description:
 This is the part of the project on VOIP between two NVIDIA Jetson boards over TCP connection.
 This code is the initialization code and scheduler of the various threads involved at the server side of the system
 */
+#define _GNU_SOURCE
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
+
 #include <sched.h>
 #include <time.h>
 #include <unistd.h>
@@ -28,11 +30,11 @@ This code is the initialization code and scheduler of the various threads involv
 #include <netdb.h>
 #include <signal.h>
 #include <string.h>
-#define RINGBUFFER_ROWS 256 
+#define RINGBUFFER_ROWS 256
 #define RINGBUFFER_COLUMNS 128
 //#define CONST_DIST 512
 
-#define SERVER_IP "10.0.0.143"
+#define SERVER_IP "10.0.0.192"
 
 extern int errno;
 extern void int_handler();
@@ -74,7 +76,9 @@ struct sched_param rt_param[NUM_THREADS];
 struct sched_param main_param;
 pthread_attr_t main_attr;
 pid_t mainpid;
-sem_t tcpSem;
+sem_t tcpSem, rcdSem;
+pthread_mutex_t mutexsem;
+
 /*
 * SIGINT handler
 */
@@ -83,8 +87,8 @@ void int_handler()
   char ch;
   printf("Enter y to close sockets or n to keep open:");
   scanf("%c", &ch);
-  
-  if(ch == 'y') 
+
+  if(ch == 'y')
   {
     printf("\nsockets are being closed\n");
     //pthread_join(threads[0], NULL);
@@ -94,7 +98,7 @@ void int_handler()
     fclose(serverFilePtr);
     snd_pcm_drain(handle);
     snd_pcm_close(handle);
-    
+
 
   }
   exit(0);
@@ -106,7 +110,7 @@ void broken_pipe_handler()
   fprintf(stderr,"Broken pipe handler");
   pthread_join(threads[0], NULL);
   pthread_join(threads[1], NULL);
-  
+
   close(client_sock);
   close(server_sock);
 
@@ -114,7 +118,7 @@ void broken_pipe_handler()
   snd_pcm_drain(handle);
   snd_pcm_close(handle);
 
-  
+
   exit(0);
 
 }
@@ -219,17 +223,40 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params)
   }
   /* Use a buffer large enough to hold one period */
   snd_pcm_hw_params_get_period_size(params,&frames, &dir);
- 
+
   /* We want to loop for 5 seconds */
   snd_pcm_hw_params_get_period_time(params,&period_time, 0);
 
   return 0;
 }
 
+
+
+long readbuf(snd_pcm_t *handle, char *buf, long len)
+{
+    long r;
+
+    int frame_bytes = 4;
+    do {
+            r = snd_pcm_readi(handle, buf, len);
+            if (r > 0) {
+                    buf += r * frame_bytes;
+                    len -= r;
+            }
+
+            // fprintf(stderr,"r = %li, len = %li\n", r, len);
+            if(r<0)
+              fprintf(stderr,"error: %s\n", snd_strerror(r));
+    } while (r >= 1 && len > 0);
+
+        // showstat(handle, 0);
+    return r;
+}
+
 static int record(snd_pcm_t *handle){
   long loops, num;
   int rc,i;
-  
+
   loops = 5000000 / period_time;
   num=loops;
   int count=0;
@@ -241,8 +268,8 @@ static int record(snd_pcm_t *handle){
   double start = 0, stop = 0;
   double sum = 0;
   double avg_exec_time, delay, avg_exec_time_s;
-  
-  
+
+
   for(;;) {
     /* Listen on the socket */
     if(listen(server_sock, 5) < 0) {
@@ -253,7 +280,7 @@ static int record(snd_pcm_t *handle){
       {printf("Listening to port 1234\n");
       }
     /* Accept connections */
-    if((client_sock=accept(server_sock,(struct sockaddr *)&client_sockaddr,&fromlen)) < 0) 
+    if((client_sock=accept(server_sock,(struct sockaddr *)&client_sockaddr,&fromlen)) < 0)
        {
       perror("server: accept");
       exit(1);
@@ -262,9 +289,9 @@ static int record(snd_pcm_t *handle){
       {
         printf("Connection made on port 1234\n");
         break;
-      }      
-    } 
-   
+      }
+    }
+
     int lengthOfString=0;
     fp = fdopen(client_sock, "r");
 
@@ -277,36 +304,37 @@ static int record(snd_pcm_t *handle){
 #if BLOCKING==1
 int flags = fcntl(fd, F_GETFL, 0);
 fcntl(fp, F_SETFL, flags | O_NONBLOCK);
-
   #endif
-
   while(1){
-
-    start= readTOD();
+    //start= readTOD();
+    fprintf(stderr,"\n waiting at recording thread\n");
+    // pthread_mutex_lock(&mutexsem);
+    sem_wait(&rcdSem);
+    fprintf(stderr,"\n got rcdSem and now in recording\n");
     for(initial_rows_dma=0;initial_rows_dma<RINGBUFFER_ROWS; initial_rows_dma++)
       {
-        rc = snd_pcm_readi(handle, (&record_array[initial_rows_dma][RINGBUFFER_COLUMNS]), frames);  
-        
+        // rc = snd_pcm_readi(handle, (&record_array[initial_rows_dma][RINGBUFFER_COLUMNS]), frames);
+        if (readbuf(handle, (char *)record_array[initial_rows_dma], frames)<0){
+          fprintf(stderr, "read error \n");
+          break;
+        }
+        // rc = write(1, (char *)record_array[initial_rows_dma], size);
       }
-    stop = readTOD();
-    
-    delay = (double)(stop - start);
+  //  stop = readTOD();
+
+    //delay = (double)(stop - start);
    // fprintf(stderr,"Record delay in ms%lf\n",delay*1000);
     //sum_dma += delay;
+    // pthread_mutex_unlock(&mutexsem);
     sem_post(&tcpSem);
-
-
   }
-
   #endif
-
-
  /* avg_exec_time=((sum/6896)*1000000);
   fprintf(stderr,"THe average time for executing is %lf in us ",avg_exec_time);
   fclose(serverFilePtr);*/
   snd_pcm_drain(handle);
   snd_pcm_close(handle);
- 
+
   close(client_sock);
 }
 
@@ -317,16 +345,23 @@ void *sendThread(void *threadp)
   double start = 0, stop = 0;
   double sum = 0;
   double avg_exec_time, delay, avg_exec_time_s;
-  
+
 while(1){
+    fprintf(stderr,"\n waiting at sendTHread\n");
     sem_wait(&tcpSem);
+    fprintf(stderr,"\n Got tcpSem and now sending audio\n");
     start= readTOD();
+    // pthread_mutex_lock(&mutexsem);
     for(initial_rows_tcp=0;initial_rows_tcp<RINGBUFFER_ROWS; initial_rows_tcp++)
     {
+      // rc = write(1, (char *)record_array[initial_rows_tcp], size);
       send(client_sock, (&record_array[initial_rows_tcp][RINGBUFFER_COLUMNS]), RINGBUFFER_COLUMNS, 0);
     }
-    stop = readTOD();
-    delay = (double)(stop - start);
+
+    sem_post(&rcdSem);
+    // pthread_mutex_unlock(&mutexsem);
+    // stop = readTOD();
+    // delay = (double)(stop - start);
     //fprintf(stderr,"Send delay in ms%lf\n",delay*1000);
     //sum += delay;
   }
@@ -339,7 +374,7 @@ void *recordThread(void *threadp)
   struct timespec timeOut;
   clock_gettime(my_clock,&timeNowRead);
   printf("Read Time is:%lds %ldns\n",timeNowRead.tv_sec,timeNowRead.tv_nsec);
-  timeOut.tv_sec=timeNowRead.tv_sec+10;       
+  timeOut.tv_sec=timeNowRead.tv_sec+10;
   size = frames * 4; /* 2 bytes/sample, 2 channels */
   fprintf(stderr,"recordThread runs");
   rc = snd_pcm_open(&handle, "default",
@@ -350,7 +385,7 @@ void *recordThread(void *threadp)
             snd_strerror(rc));
     exit(1);
   }
- 
+
  if ((rc = set_hwparams(handle, params)) < 0) {
       printf("Setting of hwparams failed: %s\n",snd_strerror(rc));
       exit(EXIT_FAILURE);
@@ -360,7 +395,7 @@ void *recordThread(void *threadp)
 
 void initializeServer()
 {
-  
+
   char hostname[64];
   struct hostent *hp;
   struct linger opt;
@@ -382,7 +417,7 @@ void initializeServer()
 
   /* Bind address to the socket */
   if(bind(server_sock, (struct sockaddr *) &server_sockaddr,
-            sizeof(server_sockaddr)) < 0) 
+            sizeof(server_sockaddr)) < 0)
     {
     perror("server: bind");
     exit(1);
@@ -395,7 +430,7 @@ void initializeServer()
     opt.l_linger = 0;
 
     sockarg = 1;
- 
+
     setsockopt(server_sock, SOL_SOCKET, SO_LINGER, (char*) &opt, sizeof(opt));
     setsockopt(client_sock, SOL_SOCKET, SO_REUSEADDR, (char *)&sockarg, sizeof(int));
   signal(SIGINT, int_handler);
@@ -408,16 +443,20 @@ void initializeServer()
 
 int main (int argc, char *argv[])
 {
+
+  sem_init(&rcdSem,0,0);
   sem_init(&tcpSem,0,1);
 	int rc;
 	int i;
 	cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(1, &cpuset);
 	mainpid=getpid();
-  
+
 	//Scheduler
 	print_scheduler();
 	rc=sched_getparam(mainpid, &main_param);
-	if (rc) 
+	if (rc)
    {
        printf("ERROR; sched_setscheduler rc is %d\n", rc);
        perror(NULL);
@@ -439,6 +478,7 @@ int main (int argc, char *argv[])
 		rc=pthread_attr_setschedpolicy(&rt_sched_attr[i], SCHED_FIFO);
 		rt_param[i].sched_priority=rt_max_prio-i-1;
 		pthread_attr_setschedparam(&rt_sched_attr[i], &rt_param[i]);
+    pthread_attr_setaffinity_np(&rt_sched_attr[i], sizeof(cpu_set_t), &cpuset);
 		threadParams[i].threadIdx=i;
 	}
 /*********************************************************************************/
@@ -459,7 +499,7 @@ int main (int argc, char *argv[])
 					 );
 
 //sequence//
-  
+
 /*********************************************************************************/
     pthread_join(threads[0], NULL);
     pthread_join(threads[1],NULL);
