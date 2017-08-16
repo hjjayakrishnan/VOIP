@@ -1,9 +1,9 @@
 /**************************************************************************
 * Authors: 	HJ Jayakrishnan, Richard Noronha, Sahana Sadagopan
-* University: University of Colorado Boulder
-* Date: 		8th August 2017
+* University:   University of Colorado Boulder
+* Date: 	8th August 2017
 * Course: 	Real time Embedded Systems
-* Professor: Sam Siewart, PhD
+* Professor:    Sam Siewart, PhD
 
 
 * Description: This file is the client which playbacks the audio and received
@@ -506,16 +506,16 @@ int main (int argc, char *argv[])
 
 	//Thread creation
   pthread_create(&threads[0],   // pointer to thread descriptor
-			    &rt_sched_attr[0],     // use default attributes
-			    dmaWriteThread, // thread function entry
-          (void *)&(threadParams[0]) // parameters to pass in		//Cant pass nothing so just pass a number
-					);
+                 &rt_sched_attr[0],     // use default attributes
+	         dmaWriteThread, // thread function entry
+                 (void *)&(threadParams[0]) // parameters to pass in		//Cant pass nothing so just pass a number
+		);
 
-	pthread_create(&threads[1],   // pointer to thread descriptor
-					  &rt_sched_attr[1],     // use default attributes
-					 playBackthread, // thread function entry point
-					  (void *)&(threadParams[1]) // parameters to pass in		//Cant pass nothing so just pass a number
-					 );
+  pthread_create(&threads[1],   // pointer to thread descriptor
+		 &rt_sched_attr[1],     // use default attributes
+		 playBackthread, // thread function entry point
+	         (void *)&(threadParams[1]) // parameters to pass in		//Cant pass nothing so just pass a number
+		);
 /*********************************************************************************/
   pthread_join(threads[0], NULL);
   pthread_join(threads[1], NULL);
