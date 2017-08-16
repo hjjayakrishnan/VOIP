@@ -1,9 +1,9 @@
 /**************************************************************************
 * Authors: 	HJ Jayakrishnan, Richard Noronha, Sahana Sadagopan
-* University: University of Colorado Boulder
-* Date: 		8th August 2017
+* University:   University of Colorado Boulder
+* Date: 	8th August 2017
 * Course: 	Real time Embedded Systems
-* Professor: Sam Siewart, PhD
+* Professor:    Sam Siewart, PhD
 
 
 * Description: This file is the server which records the audio and sends it
@@ -460,12 +460,14 @@ int main (int argc, char *argv[])
   sem_init(&tcpSem,0,1);
   int rc;
   int i;
+	
+  /* Setting core affinity */
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
   CPU_SET(1, &cpuset);
   mainpid=getpid();
 
-	//Scheduler
+  /* Scheduler */
   print_scheduler();
   rc=sched_getparam(mainpid, &main_param);
   if (rc)
