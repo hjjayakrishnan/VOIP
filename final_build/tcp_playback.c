@@ -306,6 +306,7 @@ long writebuf(snd_pcm_t *handle, char *buf, long len)
 {
   long r;
   int frame_bytes = 4;
+  int err;
   while (len > 0) {
     r = snd_pcm_writei(handle, buf, len);
     if (r == -EPIPE){
