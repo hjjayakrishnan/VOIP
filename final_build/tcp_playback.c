@@ -308,6 +308,13 @@ long writebuf(snd_pcm_t *handle, char *buf, long len)
   int frame_bytes = 4;
   while (len > 0) {
     r = snd_pcm_writei(handle, buf, len);
+    if (r == -EPIPE){
+      err = snd_pcm_prepare(handle);
+      if (err < 0){
+        fprintf(stderr, "Can't recovery from underrun, prepare failed: %s\n", snd_strerror(err));
+        return 0;
+      }
+    }
     if (r < frames){
       fprintf(stderr, "\nreturn : %ld", r);
     }
