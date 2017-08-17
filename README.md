@@ -1,5 +1,6 @@
 # VOIP
-Real Time Embedded Systems Project
+Real Time Embedded Systems Project (ECEN 5623)
+
 This is an implementation of a one way VOIP system developed using 2 priority preemptive( POSIX SCHED_FIFO) real time services on each end. 
 
 
